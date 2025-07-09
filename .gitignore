@@ -1,0 +1,64 @@
+# Ignore everything by default
+*
+
+# But include Python files
+!*.py
+
+# Include requirements.txt
+!requirements.txt
+
+# Include .gitignore itself
+!.gitignore
+
+# Explicitly ignore common directories and files
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Ignore data files
+*.csv
+*.zip
+*.json
+*.xml
+*.txt
+!requirements.txt
+
+# Ignore studies directory
+studies/
+
+# Ignore system files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Ignore log files
+*.log 
