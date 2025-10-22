@@ -110,6 +110,10 @@ def add_institution_name(dcm_file_path, institution_name, create_backup=True, pa
         if original_study_uid not in study_mapping:
             study_mapping[original_study_uid] = generate_uid()
 
+        # Set the date and time to current date and time
+        ds.StudyDate = datetime.now().strftime('%Y%m%d')
+        ds.StudyTime = datetime.now().strftime('%H%M%S')
+
         ds.StudyInstanceUID = study_mapping[original_study_uid]
 
         ds.SeriesInstanceUID = generate_uid()
@@ -179,11 +183,7 @@ def main():
     print("=" * 40)
 
     # Get institution name to set
-    while True:
-        institution_name = input("Enter the institution name to set: ").strip()
-        if institution_name:
-            break
-        print("Error: Institution name cannot be empty.")
+    institution_name = input("Enter the institution name to set: ").strip()
 
     print(f"\nInstitution name to set: '{institution_name}'")
 
