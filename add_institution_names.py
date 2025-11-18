@@ -91,7 +91,7 @@ def add_institution_name(dcm_file_path, institution_name, create_backup=True, pa
         if create_backup:
             backup_path = backup_file(dcm_file_path)
 
-            # Generate proper DICOM UIDs (numeric only, dot-separated)
+        # Generate proper DICOM UIDs (numeric only, dot-separated)
         # Map original PatientID to new consistent PatientID
         original_patient_id = str(ds.PatientID) if hasattr(
             ds, 'PatientID') and ds.PatientID else 'UNKNOWN_PATIENT'
@@ -99,7 +99,7 @@ def add_institution_name(dcm_file_path, institution_name, create_backup=True, pa
             patient_mapping[original_patient_id] = generate_patient_id()
             # Generate patient name for new patient
             patient_suffix = random.randint(1000, 9999)
-            patient_mapping[f"{original_patient_id}_name"] = f"Testing Patient {patient_suffix}"
+            patient_mapping[f"{original_patient_id}_name"] = f"Upload Testing Patient {patient_suffix}"
 
         ds.PatientID = patient_mapping[original_patient_id]
         ds.PatientName = patient_mapping[f"{original_patient_id}_name"]
@@ -183,7 +183,7 @@ def main():
     print("=" * 40)
 
     # Get institution name to set
-    institution_name = input("Enter the institution name to set: ").strip()
+    institution_name = input("Enter the institution name to set: ").strip().strip('\'"')
 
     print(f"\nInstitution name to set: '{institution_name}'")
 
@@ -228,7 +228,7 @@ def main():
     if reorganize_files:
         while True:
             output_dir = input(
-                "Enter output directory for reorganized files (or press Enter for 'reorganized'): ").strip()
+                "Enter output directory for reorganized files (or press Enter for 'reorganized'): ").strip().strip('\'"')
             if not output_dir:
                 output_dir = "reorganized"
 
@@ -243,7 +243,7 @@ def main():
     if choice == '1':
         # Single file mode
         while True:
-            file_path = input("Enter the path to the DICOM file: ").strip()
+            file_path = input("Enter the path to the DICOM file: ").strip().strip('\'"')
             if os.path.exists(file_path):
                 if file_path.lower().endswith('.dcm'):
                     break
@@ -258,7 +258,7 @@ def main():
         # Directory mode
         while True:
             root_dir = input(
-                "Enter the directory path (or press Enter for current directory): ").strip()
+                "Enter the directory path (or press Enter for current directory): ").strip().strip('\'"')
             if not root_dir:
                 root_dir = "."
 
