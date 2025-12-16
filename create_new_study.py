@@ -19,20 +19,7 @@ except ImportError:
     sys.exit(1)
 
 
-def backup_file(file_path):
-    """
-    Create a backup of the original file.
 
-    Args:
-        file_path (str): Path to the file to backup
-
-    Returns:
-        str: Path to the backup file
-    """
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    backup_path = f"{file_path}.backup_{timestamp}"
-    shutil.copy2(file_path, backup_path)
-    return backup_path
 
 
 def generate_patient_id():
@@ -47,7 +34,7 @@ def generate_patient_id():
 
 
 def create_new_study(dcm_file_path, institution_name, patient_name, 
-                     create_backup=True, mappings=None, base_output_dir=None):
+                     mappings=None, base_output_dir=None):
     """
     Create a new study from DICOM file with new IDs while preserving structure.
 
@@ -55,12 +42,11 @@ def create_new_study(dcm_file_path, institution_name, patient_name,
         dcm_file_path (str): Path to the DICOM file
         institution_name (str): New institution name to set
         patient_name (str): New patient name to set
-        create_backup (bool): Whether to create a backup before modifying
         mappings (dict): Dictionary containing ID mappings to maintain consistency
         base_output_dir (str): Base directory for reorganized files
 
     Returns:
-        tuple: (success, error_message, backup_path, new_file_path, mappings)
+        tuple: (success, error_message, new_file_path, mappings)
     """
     if mappings is None:
         mappings = {
@@ -75,9 +61,8 @@ def create_new_study(dcm_file_path, institution_name, patient_name,
         ds = pydicom.dcmread(dcm_file_path, force=True)
 
         # Create backup if requested
-        backup_path = None
-        if create_backup:
-            backup_path = backup_file(dcm_file_path)
+        # (Backup functionality removed)
+
 
         # ===== PATIENT ID MAPPING =====
         # Generate new PatientID once for all files
@@ -103,9 +88,10 @@ def create_new_study(dcm_file_path, institution_name, patient_name,
             ds, 'SeriesInstanceUID') and ds.SeriesInstanceUID else None
         
         if original_series_uid and original_series_uid not in mappings['series_map']:
-            # Get series description to preserve it
-            series_description = str(ds.SeriesDescription) if hasattr(
-                ds, 'SeriesDescription') and ds.SeriesDescription else ""
+            # Generate generic series description and protocol name
+            series_count = len(mappings['series_map']) + 1
+            series_description = f"Series {series_count}"
+            protocol_name = f"Protocol {series_count}"
             series_number = ds.SeriesNumber if hasattr(ds, 'SeriesNumber') else None
             
             # Create new series UID
@@ -113,14 +99,19 @@ def create_new_study(dcm_file_path, institution_name, patient_name,
             mappings['series_map'][original_series_uid] = {
                 'new_uid': new_series_uid,
                 'description': series_description,
+                'protocol_name': protocol_name,
                 'number': series_number
             }
         
         if original_series_uid and original_series_uid in mappings['series_map']:
-            ds.SeriesInstanceUID = mappings['series_map'][original_series_uid]['new_uid']
-            # Preserve series description
-            if mappings['series_map'][original_series_uid]['description']:
-                ds.SeriesDescription = mappings['series_map'][original_series_uid]['description']
+            series_info = mappings['series_map'][original_series_uid]
+            ds.SeriesInstanceUID = series_info['new_uid']
+            
+            # Set anonymized series description
+            ds.SeriesDescription = series_info['description']
+            
+            # Set anonymized protocol name
+            ds.ProtocolName = series_info['protocol_name']
 
         # ===== INSTANCE UID MAPPING =====
         # Map original SOPInstanceUID to new one (unique for each instance)
@@ -188,10 +179,10 @@ def create_new_study(dcm_file_path, institution_name, patient_name,
         else:
             ds.save_as(new_file_path, write_like_original=False)
 
-        return True, None, backup_path, new_file_path, mappings
+        return True, None, new_file_path, mappings
 
     except Exception as e:
-        return False, str(e), None, None, mappings
+        return False, str(e), None, mappings
 
 
 def find_dcm_files(root_directory):
@@ -225,18 +216,20 @@ def main():
     print("=" * 70)
 
     # Get institution name
-    while True:
-        institution_name = input("\nEnter the new institution name: ").strip()
-        if institution_name:
-            break
-        print("Institution name cannot be empty.")
+    institution_input = input("\nEnter the new institution name (press Enter to auto-generate): ").strip()
+    if institution_input:
+        institution_name = institution_input
+    else:
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        institution_name = f"AutoInst_{timestamp}"
 
     # Get patient name
-    while True:
-        patient_name = input("Enter the new patient name: ").strip()
-        if patient_name:
-            break
-        print("Patient name cannot be empty.")
+    patient_input = input("Enter the new patient name (press Enter to auto-generate): ").strip()
+    if patient_input:
+        patient_name = patient_input
+    else:
+        import random
+        patient_name = f"AutoPatient_{datetime.now().strftime('%Y%m%d')}_{random.randint(1000, 9999)}"
 
     print(f"\n✓ Institution Name: '{institution_name}'")
     print(f"✓ Patient Name: '{patient_name}'")
@@ -247,23 +240,13 @@ def main():
     print("2. Process all files in a directory (recommended for complete studies)")
 
     while True:
-        choice = input("Enter your choice (1 or 2): ").strip()
+        choice = input("Enter your choice (1 or 2) [default: 2]: ").strip()
+        if not choice:
+            choice = '2'
+            print("Using default: 2")
         if choice in ['1', '2']:
             break
         print("Invalid choice. Please enter 1 or 2.")
-
-    # Choose backup option
-    print("\nBackup options:")
-    print("1. Create backups of original files (recommended)")
-    print("2. No backups (process files directly)")
-
-    while True:
-        backup_choice = input("Enter your choice (1 or 2): ").strip()
-        if backup_choice in ['1', '2']:
-            break
-        print("Invalid choice. Please enter 1 or 2.")
-
-    create_backup = backup_choice == '1'
 
     # Choose output directory
     print("\nOutput options:")
@@ -271,7 +254,10 @@ def main():
     print("2. Modify files in place")
 
     while True:
-        org_choice = input("Enter your choice (1 or 2): ").strip()
+        org_choice = input("Enter your choice (1 or 2) [default: 1]: ").strip()
+        if not org_choice:
+            org_choice = '1'
+            print("Using default: 1")
         if org_choice in ['1', '2']:
             break
         print("Invalid choice. Please enter 1 or 2.")
@@ -337,7 +323,6 @@ def main():
     print(f"  • Files to process: {len(files_to_process)}")
     print(f"  • Institution name: '{institution_name}'")
     print(f"  • Patient name: '{patient_name}'")
-    print(f"  • Create backups: {'Yes' if create_backup else 'No'}")
     print(f"  • Create organized structure: {'Yes' if reorganize_files else 'No'}")
     if reorganize_files:
         print(f"  • Output directory: {base_output_dir}")
@@ -367,24 +352,18 @@ def main():
     for i, dcm_file_path in enumerate(files_to_process, 1):
         print(f"\nProcessing ({i}/{len(files_to_process)}): {dcm_file_path}")
 
-        success, error, backup_path, new_file_path, mappings = create_new_study(
+        success, error, new_file_path, mappings = create_new_study(
             dcm_file_path, institution_name, patient_name, 
-            create_backup, mappings, base_output_dir
+            mappings, base_output_dir
         )
 
         if success:
             success_count += 1
             print(f"  ✓ SUCCESS")
-            if backup_path:
-                print(f"    Backup: {backup_path}")
-            if new_file_path != dcm_file_path:
-                print(f"    New location: {new_file_path}")
-
             results.append({
                 'original_file_path': dcm_file_path,
                 'new_file_path': new_file_path,
                 'status': 'SUCCESS',
-                'backup_path': backup_path or '',
                 'error': ''
             })
         else:
@@ -395,7 +374,6 @@ def main():
                 'original_file_path': dcm_file_path,
                 'new_file_path': '',
                 'status': 'ERROR',
-                'backup_path': '',
                 'error': error
             })
 
@@ -425,7 +403,7 @@ def main():
     try:
         import csv
         with open(log_file, 'w', newline='', encoding='utf-8') as csvfile:
-            fieldnames = ['original_file_path', 'new_file_path', 'status', 'backup_path', 'error']
+            fieldnames = ['original_file_path', 'new_file_path', 'status', 'error']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
             writer.writeheader()
@@ -470,9 +448,7 @@ def main():
     except Exception as e:
         print(f"Error saving mapping file: {e}")
 
-    if create_backup and success_count > 0:
-        print(f"\n💾 Backup files created for successful modifications.")
-        print(f"   To restore originals, rename .backup_* files back to .dcm")
+
 
     if reorganize_files and success_count > 0:
         print(f"\n📂 Files have been reorganized in: {base_output_dir}")
